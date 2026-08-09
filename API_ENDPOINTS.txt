@@ -19,13 +19,11 @@ This API uses JWT (JSON Web Token) authentication. Most endpoints require an acc
   "username": "testuser",
   "email": "test@example.com",
   "password": "password123",
-  "role": "admin"
+  "organisation": "Optional Company Name"
 }
 ```
 
-**Role Options:**
-- "admin" - Full access to all features
-- "staff" - Limited access to assigned tasks only
+**Note:** All self-registered users automatically get `role: "staff"` by default for security. Admin users must be created through the Django admin panel by an existing admin.
 
 **Response (201 Created):**
 ```json
@@ -337,7 +335,7 @@ Authorization: Bearer <your_access_token>
   "username": "testuser",
   "email": "test@example.com",
   "password": "password123",
-  "role": "admin"
+  "organisation": "Optional Company Name"
 }
 ```
 6. Click "Send" and save to collection
@@ -413,7 +411,7 @@ For all authenticated requests:
 ```bash
 curl -X POST http://localhost:8000/api/users/register/ \
   -H "Content-Type: application/json" \
-  -d '{"username":"testuser","email":"test@example.com","password":"password123","role":"admin"}'
+  -d '{"username":"testuser","email":"test@example.com","password":"password123","organisation":"Optional Company Name"}'
 ```
 
 ### Login
