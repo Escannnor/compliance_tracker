@@ -1,0 +1,90 @@
+# HOW TO RUN THIS PROJECT
+# Read this top to bottom. Every command is explained.
+
+# ─────────────────────────────────────────────
+# STEP 1 — Install dependencies
+# ─────────────────────────────────────────────
+pip install -r requirements.txt
+
+
+# ─────────────────────────────────────────────
+# STEP 2 — Run with Docker (recommended)
+# This starts Django + PostgreSQL + Redis + Celery all at once
+# ─────────────────────────────────────────────
+docker-compose up --build
+
+# Then in a new terminal, create the database tables:
+docker-compose exec web python manage.py migrate
+
+# Create an admin user:
+docker-compose exec web python manage.py createsuperuser
+
+
+# ─────────────────────────────────────────────
+# STEP 3 — Test the API endpoints
+# Use Postman or curl
+# ─────────────────────────────────────────────
+
+# Register a user
+POST http://localhost:8000/api/users/register/
+Body: { "username": "sodiq", "email": "s@s.com", "password": "pass1234", "role": "admin" }
+
+# Login — get your JWT token
+POST http://localhost:8000/api/auth/login/
+Body: { "username": "sodiq", "password": "pass1234" }
+# Response gives you: access token + refresh token
+# Copy the access token
+
+# Use the token in all other requests:
+# Header: Authorization: Bearer <your_access_token>
+
+# Create a compliance task
+POST http://localhost:8000/api/tasks/
+Header: Authorization: Bearer <token>
+Body: {
+  "title": "Submit ISO 27001 Audit Report",
+  "description": "Annual audit submission to regulatory body",
+  "priority": "critical",
+  "deadline": "2026-06-30T17:00:00Z",
+  "organisation": "Smartcomply"
+}
+
+# List all tasks (first call hits DB, second call hits Redis cache)
+GET http://localhost:8000/api/tasks/
+Header: Authorization: Bearer <token>
+# Notice "source": "database" first time, "source": "cache" second time
+
+# Update a task
+PATCH http://localhost:8000/api/tasks/1/
+Header: Authorization: Bearer <token>
+Body: { "status": "completed" }
+
+# Delete a task
+DELETE http://localhost:8000/api/tasks/1/
+Header: Authorization: Bearer <token>
+
+
+# ─────────────────────────────────────────────
+# STEP 4 — Run the Celery background task manually
+# ─────────────────────────────────────────────
+# Open Django shell:
+docker-compose exec web python manage.py shell
+
+# Inside the shell:
+from apps.tasks.tasks import check_overdue_tasks
+check_overdue_tasks.delay()   # sends job to Redis, Celery worker picks it up
+
+
+# ─────────────────────────────────────────────
+# UNDERSTANDING MIGRATIONS
+# ─────────────────────────────────────────────
+# When you change a model (add a field, rename something):
+#
+# 1. python manage.py makemigrations
+#    → Django reads your models.py and creates a migration file
+#    → This file describes what changed in the database
+#
+# 2. python manage.py migrate
+#    → Django applies that migration file to the actual database
+#
+# Think of migrations as version control for your database schema.

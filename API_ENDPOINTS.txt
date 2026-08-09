@@ -1,0 +1,490 @@
+# API Endpoints Documentation
+# Compliance Task Tracker API
+
+Base URL: http://localhost:8000/api/
+
+## Authentication
+This API uses JWT (JSON Web Token) authentication. Most endpoints require an access token in the Authorization header.
+
+## Getting Your Access Token
+
+### 1. Register a New User
+**Endpoint:** POST /api/users/register/
+**Authentication:** Not required
+**Description:** Create a new user account
+
+**Request Body (JSON):**
+```json
+{
+  "username": "testuser",
+  "email": "test@example.com",
+  "password": "password123",
+  "role": "admin"
+}
+```
+
+**Role Options:**
+- "admin" - Full access to all features
+- "staff" - Limited access to assigned tasks only
+
+**Response (201 Created):**
+```json
+{
+  "id": 1,
+  "username": "testuser",
+  "email": "test@example.com",
+  "role": "admin",
+  "organisation": ""
+}
+```
+
+---
+
+### 2. Login (Get JWT Token)
+**Endpoint:** POST /api/auth/login/
+**Authentication:** Not required
+**Description:** Authenticate and receive access + refresh tokens
+
+**Request Body (JSON):**
+```json
+{
+  "username": "testuser",
+  "password": "password123"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Important:** Copy the `access` token - you'll need it for all authenticated requests.
+
+---
+
+### 3. Refresh Access Token
+**Endpoint:** POST /api/auth/refresh/
+**Authentication:** Not required (uses refresh token)
+**Description:** Get a new access token using your refresh token
+
+**Request Body (JSON):**
+```json
+{
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+---
+
+## User Endpoints
+
+### 4. Get Current User Profile
+**Endpoint:** GET /api/users/me/
+**Authentication:** Required (Bearer token)
+**Description:** Get the currently authenticated user's profile
+
+**Headers:**
+```
+Authorization: Bearer <your_access_token>
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": 1,
+  "username": "testuser",
+  "email": "test@example.com",
+  "role": "admin",
+  "organisation": ""
+}
+```
+
+---
+
+## Task Endpoints
+
+### 5. List All Tasks
+**Endpoint:** GET /api/tasks/
+**Authentication:** Required (Bearer token)
+**Description:** Get all compliance tasks (admin sees all, staff sees only assigned)
+**Caching:** Results cached in Redis for 60 seconds
+
+**Headers:**
+```
+Authorization: Bearer <your_access_token>
+```
+
+**Response (200 OK):**
+```json
+{
+  "source": "database",
+  "data": [
+    {
+      "id": 1,
+      "title": "Submit ISO 27001 Audit Report",
+      "description": "Annual audit submission to regulatory body",
+      "status": "pending",
+      "priority": "critical",
+      "deadline": "2026-06-30T17:00:00Z",
+      "organisation": "Smartcomply",
+      "assigned_to": null,
+      "created_by": 1,
+      "created_at": "2026-08-09T10:00:00Z",
+      "updated_at": "2026-08-09T10:00:00Z"
+    }
+  ]
+}
+```
+
+**Note:** If `"source": "cache"`, the response came from Redis (instant). If `"source": "database"`, it came from PostgreSQL.
+
+---
+
+### 6. Create a New Task
+**Endpoint:** POST /api/tasks/
+**Authentication:** Required (Bearer token)
+**Permission:** Admin only
+**Description:** Create a new compliance task
+
+**Headers:**
+```
+Authorization: Bearer <your_access_token>
+Content-Type: application/json
+```
+
+**Request Body (JSON):**
+```json
+{
+  "title": "Submit ISO 27001 Audit Report",
+  "description": "Annual audit submission to regulatory body",
+  "priority": "critical",
+  "deadline": "2026-06-30T17:00:00Z",
+  "organisation": "Smartcomply",
+  "assigned_to": null
+}
+```
+
+**Priority Options:**
+- "low"
+- "medium"
+- "high"
+- "critical"
+
+**Status Options (auto-set to "pending" on creation):**
+- "pending"
+- "in_progress"
+- "completed"
+- "overdue"
+
+**Response (201 Created):**
+```json
+{
+  "id": 1,
+  "title": "Submit ISO 27001 Audit Report",
+  "description": "Annual audit submission to regulatory body",
+  "status": "pending",
+  "priority": "critical",
+  "deadline": "2026-06-30T17:00:00Z",
+  "organisation": "Smartcomply",
+  "assigned_to": null,
+  "created_by": 1,
+  "created_at": "2026-08-09T10:00:00Z",
+  "updated_at": "2026-08-09T10:00:00Z"
+}
+```
+
+**Error Response (403 Forbidden):**
+```json
+{
+  "error": "Only admins can create tasks."
+}
+```
+
+---
+
+### 7. Get a Specific Task
+**Endpoint:** GET /api/tasks/{id}/
+**Authentication:** Required (Bearer token)
+**Description:** Get details of a specific task by ID
+
+**Headers:**
+```
+Authorization: Bearer <your_access_token>
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": 1,
+  "title": "Submit ISO 27001 Audit Report",
+  "description": "Annual audit submission to regulatory body",
+  "status": "pending",
+  "priority": "critical",
+  "deadline": "2026-06-30T17:00:00Z",
+  "organisation": "Smartcomply",
+  "assigned_to": null,
+  "created_by": 1,
+  "created_at": "2026-08-09T10:00:00Z",
+  "updated_at": "2026-08-09T10:00:00Z"
+}
+```
+
+**Error Responses:**
+- 404 Not Found: Task doesn't exist
+- 403 Forbidden: Staff user trying to access unassigned task
+
+---
+
+### 8. Update a Task
+**Endpoint:** PATCH /api/tasks/{id}/
+**Authentication:** Required (Bearer token)
+**Description:** Update specific fields of a task (partial update)
+
+**Headers:**
+```
+Authorization: Bearer <your_access_token>
+Content-Type: application/json
+```
+
+**Request Body (JSON) - Only include fields you want to change:**
+```json
+{
+  "status": "in_progress"
+}
+```
+
+**Or update multiple fields:**
+```json
+{
+  "status": "completed",
+  "description": "Updated description",
+  "assigned_to": 2
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": 1,
+  "title": "Submit ISO 27001 Audit Report",
+  "description": "Updated description",
+  "status": "completed",
+  "priority": "critical",
+  "deadline": "2026-06-30T17:00:00Z",
+  "organisation": "Smartcomply",
+  "assigned_to": 2,
+  "created_by": 1,
+  "created_at": "2026-08-09T10:00:00Z",
+  "updated_at": "2026-08-09T11:00:00Z"
+}
+```
+
+**Error Responses:**
+- 400 Bad Request: Invalid data
+- 403 Forbidden: Staff user trying to update unassigned task
+- 404 Not Found: Task doesn't exist
+
+---
+
+### 9. Delete a Task
+**Endpoint:** DELETE /api/tasks/{id}/
+**Authentication:** Required (Bearer token)
+**Permission:** Admin only
+**Description:** Delete a task permanently
+
+**Headers:**
+```
+Authorization: Bearer <your_access_token>
+```
+
+**Response (204 No Content):**
+(empty response body)
+
+**Error Responses:**
+- 403 Forbidden: Non-admin user trying to delete
+- 404 Not Found: Task doesn't exist
+
+---
+
+## Postman Setup Instructions
+
+### Step 1: Create a New Collection
+1. Open Postman
+2. Click "New" → "Collection"
+3. Name it "Compliance Tracker API"
+4. Add a base URL variable: `base_url` = `http://localhost:8000/api`
+
+### Step 2: Create Authentication Requests
+
+**Register Request:**
+1. Click "New" → "HTTP Request"
+2. Name: "Register User"
+3. Method: POST
+4. URL: `{{base_url}}/users/register/`
+5. Body → raw → JSON:
+```json
+{
+  "username": "testuser",
+  "email": "test@example.com",
+  "password": "password123",
+  "role": "admin"
+}
+```
+6. Click "Send" and save to collection
+
+**Login Request:**
+1. Name: "Login"
+2. Method: POST
+3. URL: `{{base_url}}/auth/login/`
+4. Body → raw → JSON:
+```json
+{
+  "username": "testuser",
+  "password": "password123"
+}
+```
+5. Click "Send"
+6. Copy the `access` token from the response
+
+### Step 3: Set Up Authorization for Other Requests
+
+For all authenticated requests:
+1. Go to the "Authorization" tab
+2. Type: "Bearer Token"
+3. Token: Paste your access token
+4. Save the request
+
+### Step 4: Create Task Requests
+
+**List Tasks:**
+- Method: GET
+- URL: `{{base_url}}/tasks/`
+- Add Authorization header with your token
+
+**Create Task:**
+- Method: POST
+- URL: `{{base_url}}/tasks/`
+- Body → raw → JSON:
+```json
+{
+  "title": "Test Task",
+  "description": "Testing Postman",
+  "priority": "medium",
+  "deadline": "2026-12-31T17:00:00Z",
+  "organisation": "TestOrg"
+}
+```
+
+**Update Task:**
+- Method: PATCH
+- URL: `{{base_url}}/tasks/1/` (replace 1 with actual task ID)
+- Body → raw → JSON:
+```json
+{
+  "status": "completed"
+}
+```
+
+**Delete Task:**
+- Method: DELETE
+- URL: `{{base_url}}/tasks/1/` (replace 1 with actual task ID)
+
+### Step 5: Test Caching
+
+1. Call GET /api/tasks/ twice
+2. First response will show `"source": "database"`
+3. Second response (within 60 seconds) will show `"source": "cache"`
+
+---
+
+## curl Examples
+
+### Register
+```bash
+curl -X POST http://localhost:8000/api/users/register/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","email":"test@example.com","password":"password123","role":"admin"}'
+```
+
+### Login
+```bash
+curl -X POST http://localhost:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","password":"password123"}'
+```
+
+### List Tasks (with token)
+```bash
+curl -X GET http://localhost:8000/api/tasks/ \
+  -H "Authorization: Bearer <your_access_token>"
+```
+
+### Create Task
+```bash
+curl -X POST http://localhost:8000/api/tasks/ \
+  -H "Authorization: Bearer <your_access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Test Task","description":"Test","priority":"medium","deadline":"2026-12-31T17:00:00Z","organisation":"TestOrg"}'
+```
+
+### Update Task
+```bash
+curl -X PATCH http://localhost:8000/api/tasks/1/ \
+  -H "Authorization: Bearer <your_access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"completed"}'
+```
+
+### Delete Task
+```bash
+curl -X DELETE http://localhost:8000/api/tasks/1/ \
+  -H "Authorization: Bearer <your_access_token>"
+```
+
+---
+
+## Interactive Documentation
+
+For an interactive testing interface, visit:
+- Swagger UI: http://localhost:8000/api/docs/
+- ReDoc: http://localhost:8000/api/redoc/
+
+These provide auto-generated documentation with built-in testing capabilities.
+
+---
+
+## Error Handling
+
+Common HTTP Status Codes:
+- 200 OK - Request successful
+- 201 Created - Resource created successfully
+- 204 No Content - Successful deletion
+- 400 Bad Request - Invalid input data
+- 401 Unauthorized - Missing or invalid token
+- 403 Forbidden - Insufficient permissions
+- 404 Not Found - Resource doesn't exist
+
+Error Response Format:
+```json
+{
+  "error": "Error message description"
+}
+```
+
+---
+
+## Token Expiration
+
+- Access tokens expire after 1 hour
+- Refresh tokens expire after 7 days
+- Use the refresh endpoint to get a new access token without logging in again
