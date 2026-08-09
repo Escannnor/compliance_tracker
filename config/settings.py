@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "rest_framework",           # Django REST Framework — turns Django into an API
     "rest_framework_simplejwt", # JWT authentication
     "drf_spectacular",          # API documentation (Swagger UI)
+    "django_filters",           # Filtering support
     # Our apps
     "apps.users",
     "apps.tasks",
@@ -90,6 +91,9 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,
+    "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
 }
 
 # JWT token settings

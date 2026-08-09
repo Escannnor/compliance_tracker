@@ -115,18 +115,39 @@ Authorization: Bearer <your_access_token>
 **Endpoint:** GET /api/tasks/
 **Authentication:** Required (Bearer token)
 **Description:** Get all compliance tasks (admin sees all, staff sees only assigned)
-**Caching:** Results cached in Redis for 60 seconds
+**Pagination:** Results are paginated (10 items per page by default)
+**Filtering:** Supports filtering by status, priority, organisation, assigned user, and search
 
 **Headers:**
 ```
 Authorization: Bearer <your_access_token>
 ```
 
+**Query Parameters:**
+- `page` - Page number (default: 1)
+- `page_size` - Items per page (default: 10, max: 100)
+- `status` - Filter by status (pending, in_progress, completed, overdue)
+- `priority` - Filter by priority (low, medium, high, critical)
+- `organisation` - Filter by organisation name (case-insensitive partial match)
+- `assigned_to` - Filter by assigned user ID
+- `search` - Search in title and description fields
+
+**Examples:**
+- GET /api/tasks/?page=2&page_size=20
+- GET /api/tasks/?status=pending
+- GET /api/tasks/?priority=critical
+- GET /api/tasks/?organisation=Smartcomply
+- GET /api/tasks/?assigned_to=1
+- GET /api/tasks/?search=audit
+- GET /api/tasks/?status=pending&priority=high
+
 **Response (200 OK):**
 ```json
 {
-  "source": "database",
-  "data": [
+  "count": 25,
+  "next": "http://localhost:8000/api/tasks/?page=3",
+  "previous": "http://localhost:8000/api/tasks/?page=1",
+  "results": [
     {
       "id": 1,
       "title": "Submit ISO 27001 Audit Report",
@@ -144,7 +165,11 @@ Authorization: Bearer <your_access_token>
 }
 ```
 
-**Note:** If `"source": "cache"`, the response came from Redis (instant). If `"source": "database"`, it came from PostgreSQL.
+**Pagination Fields:**
+- `count` - Total number of tasks
+- `next` - URL to next page (null if no next page)
+- `previous` - URL to previous page (null if no previous page)
+- `results` - Array of tasks for current page
 
 ---
 
